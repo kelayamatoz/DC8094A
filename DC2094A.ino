@@ -1,4 +1,3 @@
-// driver for driving the ADC
 #include <Arduino.h>
 #include "LT_I2C.h"
 #include "LT_SPI.h"
@@ -10,6 +9,18 @@
 #include <SPI.h>
 #include "LTC2348.h"
 
+// "CONFIGURATION SETTINGS (Vref = 4.096V)"
+// "|Config Number| SS2 | SS1 | SS0 | ANALOG INPUT RANGE      | DIGITAL COMPRESSION | RESULT BINARY FORMAT |"
+// "|-------------|-----------------|-------------------------|---------------------|----------------------|"
+// "|      0      |  0  |  0  |  0  | Disable Channel         | N/A                 | All Zeros            |"
+// "|      1      |  0  |  0  |  1  | 0 - 1.25 Vref           | 1                   | Straight Binary      |"
+// "|      2      |  0  |  1  |  0  | -1.25 Vref - +1.25 Vref | 1/1.024             | Two's Complement     |"
+// "|      3      |  0  |  1  |  1  | -1.25 Vref - +1.25 Vref | 1                   | Two's Complement     |"
+// "|      4      |  1  |  0  |  0  | 0 - 2.5 Vref            | 1/1.024             | Straight Binary      |"
+// "|      5      |  1  |  0  |  1  | 0 - 2.5 Vref            | 1                   | Straight Binary      |"
+// "|      6      |  1  |  1  |  0  | -2.5 Vref - +2.5 Vref   | 1/1.024             | Two's Complement     |"
+// "|      7      |  1  |  1  |  1  | -2.5 Vref - +2.5 Vref   | 1                   | Two's Complement     |"
+
 // Macros
 #define  CONFIG_WORD_POSITION  0X07
 
@@ -20,64 +31,57 @@ uint8_t channel;
 extern Config_Word_Struct CWSTRUCT;
 
 // Function declarations
-void menu1_display_adc_output();
+void display_adc_output();
 void menu2_display_channel_CW();
-void menu3_changeCW();
+void changeCW();
 
+//! Initialize Linduino
 void setup()
 {
   uint8_t value = 0;
   uint8_t *p = &value;
-  char demo_name[] = "LTC2348-18";  
-  quikeval_I2C_init();
-  quikeval_SPI_init();
+  char demo_name[] = "LTC2348-18";  //! Demo Board Name stored in QuikEval EEPROM
+  quikeval_I2C_init();              //! Initializes Linduino I2C port.
+  quikeval_SPI_init();            //! Initializes Linduino SPI port.
 
-  Serial.begin(115200);
-  Serial.print(F("\n*****************************************************************\n"));
-  Serial.print(F("* Set the baud rate to 115200 and select the newline terminator.*\n"));
-  Serial.print(F("*****************************************************************\n"));
-  
+//  Serial.begin(115200);             //! Initialize the serial port to the PC
+  Serial.begin(230400);		// doubling the rate 
   demo_board_connected = discover_DC2094(demo_name);
-  if (demo_board_connected)
+  if (!demo_board_connected)
   {
-    Serial.print(F("\connection established"));
+	  Serial.println(F("Error: cannot connect!"));
   }
 
   i2c_read_byte(0x20, &value);      // 0x20 is the port address for i/o expander for I2C.
-  delay(100);
   value = value & 0x7F;             // P7 = WRIN = 0
   value = value | 0x04;             // P2 = WRIN2 = 1
   i2c_write_byte(0x20, value);
-  delay(100);
 
-  quikeval_SPI_connect();           // Connects to main SPI port
+  quikeval_SPI_connect();           //! Connects to main SPI port
+  changeCW();
 }
 
+//! Repeats Linduino Loop
 void loop()
 {
   int8_t user_command;                 // The user input command
   uint8_t acknowledge = 0;
   if (Serial.available())             // Check for user input
   {
-    if (acknowledge)
-      Serial.println(F("***** I2C ERROR *****"));
+	  display_adc_output();
   }
 }
 
+//! Read the ID string from the EEPROM and determine if the correct board is connected.
+//! Returns 1 if successful, 0 if not successful
 uint8_t discover_DC2094(char *demo_name)
 {
-  Serial.print(F("\nChecking EEPROM contents..."));
   read_quikeval_id_string(&ui_buffer[0]);
   ui_buffer[48] = 0;
-  Serial.println(ui_buffer);
-  
+
   if (!strcmp(demo_board.product_name, demo_name))
   {
-    Serial.println("demo_board established");
-    Serial.println(F("Demo board connected"));
-    Serial.println(F("Press Enter to Continue"));
-    read_int();
-    return 1;
+   return 1;
   }
   else
   {
@@ -85,155 +89,73 @@ uint8_t discover_DC2094(char *demo_name)
     Serial.print(demo_name);
     Serial.print(" not found, \nfound ");
     Serial.print(demo_board.name);
+    Serial.println(" instead. \nConnect the correct demo board, then press the reset button.");
     return 0;
   }
 }
 
-
 //! Displays the ADC output and calculated voltage for all channels
-void menu1_display_adc_output()
+void display_adc_output()
 {
-  uint8_t i, pos;
+  uint8_t i,k,pos;
   uint8_t channel_selected;
   uint8_t *p;
   uint8_t Result[24];
   float voltage;
+  float voltageResults[8];
   uint32_t code;
   union LT_union_int32_4bytes data;
   data.LT_uint32 = 0;
-
-  Serial.print("\nOutputing readings from all 8 channels ");
+  uint8_t j = 0;
   LTC2348_write(Result);    //discard the first reading
   LTC2348_write(Result);
-  Serial.println("ALL");
+
   for (i = 0; i < 24; i = i+3)
   {
     data.LT_byte[2] = Result[i];
     data.LT_byte[1] = Result[i+1];
     data.LT_byte[0] = Result[i+2];
+
     channel = (data.LT_uint32 & 0x38) >> 3;
-    Serial.print(F("\nChannel      : "));
-    Serial.println(channel);
+//    Serial.print(F("\nChannel      : "));
+//    Serial.println(channel);
 
     code = (data.LT_uint32 & 0xFFFFC0) >> 6;
-    Serial.print(F("Data         : 0x"));
-    Serial.println(code, HEX);
+//    Serial.print(F("Data         : 0x"));
+//    Serial.println(code, HEX);
 
-    Serial.print(F("Voltage      : "));
+//    Serial.print(F("Voltage      : "));
     voltage = LTC2348_voltage_calculator(code, channel);
-    Serial.print(voltage, 6);
-    Serial.println(F(" V"));
-
-    Serial.print(F("Config Number: "));
-    Serial.println(data.LT_byte[0] & CONFIG_WORD_POSITION);
+    voltageResults[j] = voltage;
+//    Serial.print(voltage, 6);
+//    Serial.println(F(" V"));
+    j++;
   }
-}
-
-// Debugging: display the channel values configurations 
-void menu2_display_channel_CW()
-{
-  uint8_t i, j;
-  uint8_t channel;
-  uint8_t Result[24];
-
-  Serial.print("\nEnter the channel number (0 - 7, 8: ALL): ");
-  channel = read_int();
-  if (channel < 0)
-    channel = 0;
-  else if (channel > 8)
-    channel = 8;
-
-  LTC2348_write(Result);    //discard the first reading
-  LTC2348_write(Result);
-
-  if (channel == 8)
+  // format: float float float float float float float float \n
+  for (k = 0; k < 8; k ++)
   {
-    Serial.println("ALL");
-    Serial.print("\nConfig number for each channel:");
-    j = 0;
-    for (i = 0; i < 8; ++i)
+    Serial.print(voltageResults[k], 6);
+    if (k == 7)
     {
-      Serial.print("\n\nChannel      : ");
-      Serial.println(i);
-      Serial.print("Config Number: ");
-      Serial.print(Result[j + 2] & CONFIG_WORD_POSITION);
-      j = j + 3;
+      Serial.println("");  
     }
-    Serial.print("\n");
-  }
-  else
-  {
-    Serial.println(channel);
-    Serial.print("Config Number: ");
-    Serial.println(Result[channel * 3 + 2] & CONFIG_WORD_POSITION);
+    else 
+    {
+      Serial.print(F(" "));
+    }
   }
 }
 
-//! Function to change the configuration setting
-void menu3_changeCW()
+void changeCW()
 {
-  uint8_t i, j;
-  uint8_t channel;
   uint8_t configNum;
-  uint8_t Result[24];
-
-  Serial.print("\nEnter the channel number (0 - 7, 8: ALL): ");
-  channel = read_int();
-  if (channel < 0)
-    channel = 0;
-  else if (channel > 8)
-    channel = 8;
-
-  if (channel == 8)
-    Serial.println("ALL");
-  else
-    Serial.println(channel);
-
-  Serial.print("Enter the configuration number in decimal: ");
-  configNum = read_int();
-  Serial.println(configNum);
-
-  if (channel == 8)
-  {
-    CWSTRUCT.LTC2348_CHAN0_CONFIG = configNum;
-    CWSTRUCT.LTC2348_CHAN1_CONFIG = configNum;
-    CWSTRUCT.LTC2348_CHAN2_CONFIG = configNum;
-    CWSTRUCT.LTC2348_CHAN3_CONFIG = configNum;
-    CWSTRUCT.LTC2348_CHAN4_CONFIG = configNum;
-    CWSTRUCT.LTC2348_CHAN5_CONFIG = configNum;
-    CWSTRUCT.LTC2348_CHAN6_CONFIG = configNum;
-    CWSTRUCT.LTC2348_CHAN7_CONFIG = configNum;
-  }
-  else
-  {
-    switch (channel)
-    {
-      case 0:
-        CWSTRUCT.LTC2348_CHAN0_CONFIG = configNum;
-        break;
-      case 1:
-        CWSTRUCT.LTC2348_CHAN1_CONFIG = configNum;
-        break;
-      case 2:
-        CWSTRUCT.LTC2348_CHAN2_CONFIG = configNum;
-        break;
-      case 3:
-        CWSTRUCT.LTC2348_CHAN3_CONFIG = configNum;
-        break;
-      case 4:
-        CWSTRUCT.LTC2348_CHAN4_CONFIG = configNum;
-        break;
-      case 5:
-        CWSTRUCT.LTC2348_CHAN5_CONFIG = configNum;
-        break;
-      case 6:
-        CWSTRUCT.LTC2348_CHAN6_CONFIG = configNum;
-        break;
-      case 7:
-        CWSTRUCT.LTC2348_CHAN7_CONFIG = configNum;
-        break;
-    }
-  }
-
-  Serial.print(F("\nCONFIGURATION CHANGED!"));
+  configNum = 7;
+  CWSTRUCT.LTC2348_CHAN0_CONFIG = configNum;
+  CWSTRUCT.LTC2348_CHAN1_CONFIG = configNum;
+  CWSTRUCT.LTC2348_CHAN2_CONFIG = configNum;
+  CWSTRUCT.LTC2348_CHAN3_CONFIG = configNum;
+  CWSTRUCT.LTC2348_CHAN4_CONFIG = configNum;
+  CWSTRUCT.LTC2348_CHAN5_CONFIG = configNum;
+  CWSTRUCT.LTC2348_CHAN6_CONFIG = configNum;
+  CWSTRUCT.LTC2348_CHAN7_CONFIG = configNum;
 }

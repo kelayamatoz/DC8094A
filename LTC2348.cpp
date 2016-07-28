@@ -129,7 +129,6 @@ void LTC2348_write(uint8_t Result[24])
   SPI.transfer((uint8_t)config_word);         //! Transferring byte 0
 
   output_high(QUIKEVAL_CS);                 //! Pull CS high
-  delay(100);
   output_low(QUIKEVAL_CS);
 
   for (i = 0; i < 24; ++i)
