@@ -44,8 +44,8 @@ void setup()
   quikeval_I2C_init();              //! Initializes Linduino I2C port.
   quikeval_SPI_init();            //! Initializes Linduino SPI port.
 
-//  Serial.begin(115200);             //! Initialize the serial port to the PC
-  Serial.begin(230400);		// doubling the rate 
+  Serial.begin(115200);             //! Initialize the serial port to the PC
+//  Serial.begin(230400);		// doubling the rate 
   demo_board_connected = discover_DC2094(demo_name);
   if (!demo_board_connected)
   {
