@@ -72,8 +72,6 @@ void loop()
   }
 }
 
-//! Read the ID string from the EEPROM and determine if the correct board is connected.
-//! Returns 1 if successful, 0 if not successful
 uint8_t discover_DC2094(char *demo_name)
 {
   read_quikeval_id_string(&ui_buffer[0]);
@@ -94,7 +92,6 @@ uint8_t discover_DC2094(char *demo_name)
   }
 }
 
-//! Displays the ADC output and calculated voltage for all channels
 void display_adc_output()
 {
   uint8_t i,k,pos;
@@ -117,32 +114,16 @@ void display_adc_output()
     data.LT_byte[0] = Result[i+2];
 
     channel = (data.LT_uint32 & 0x38) >> 3;
-//    Serial.print(F("\nChannel      : "));
-//    Serial.println(channel);
-
     code = (data.LT_uint32 & 0xFFFFC0) >> 6;
-//    Serial.print(F("Data         : 0x"));
-//    Serial.println(code, HEX);
-
-//    Serial.print(F("Voltage      : "));
-    voltage = LTC2348_voltage_calculator(code, channel);
-    voltageResults[j] = voltage;
-//    Serial.print(voltage, 6);
-//    Serial.println(F(" V"));
+    voltageResults[j] = LTC2348_voltage_calculator(code, channel);
     j++;
   }
-  // format: float float float float float float float float \n
+
   for (k = 0; k < 8; k ++)
   {
     Serial.print(voltageResults[k], 6);
-    if (k == 7)
-    {
-      Serial.println("");  
-    }
-    else 
-    {
-      Serial.print(F(" "));
-    }
+    if (k == 7) Serial.println("");  
+    else Serial.print(F(" "));
   }
 }
 
