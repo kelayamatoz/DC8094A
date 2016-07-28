@@ -1,6 +1,5 @@
 import serial
-with serial.Serial(port='/dev/cu.usbserial-HRA723C9',baudrate=115200,timeout=0) as ser:
+with serial.Serial(port='/dev/cu.usbserial-HRA723C9',baudrate=230400,timeout=1) as ser:
     while 1:
-        print "read one line"
-        serial_line = ser.read(size=1)
+        serial_line = ser.readline()
         print serial_line

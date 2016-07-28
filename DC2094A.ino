@@ -9,18 +9,6 @@
 #include <SPI.h>
 #include "LTC2348.h"
 
-// "CONFIGURATION SETTINGS (Vref = 4.096V)"
-// "|Config Number| SS2 | SS1 | SS0 | ANALOG INPUT RANGE      | DIGITAL COMPRESSION | RESULT BINARY FORMAT |"
-// "|-------------|-----------------|-------------------------|---------------------|----------------------|"
-// "|      0      |  0  |  0  |  0  | Disable Channel         | N/A                 | All Zeros            |"
-// "|      1      |  0  |  0  |  1  | 0 - 1.25 Vref           | 1                   | Straight Binary      |"
-// "|      2      |  0  |  1  |  0  | -1.25 Vref - +1.25 Vref | 1/1.024             | Two's Complement     |"
-// "|      3      |  0  |  1  |  1  | -1.25 Vref - +1.25 Vref | 1                   | Two's Complement     |"
-// "|      4      |  1  |  0  |  0  | 0 - 2.5 Vref            | 1/1.024             | Straight Binary      |"
-// "|      5      |  1  |  0  |  1  | 0 - 2.5 Vref            | 1                   | Straight Binary      |"
-// "|      6      |  1  |  1  |  0  | -2.5 Vref - +2.5 Vref   | 1/1.024             | Two's Complement     |"
-// "|      7      |  1  |  1  |  1  | -2.5 Vref - +2.5 Vref   | 1                   | Two's Complement     |"
-
 // Macros
 #define  CONFIG_WORD_POSITION  0X07
 
@@ -32,7 +20,6 @@ extern Config_Word_Struct CWSTRUCT;
 
 // Function declarations
 void display_adc_output();
-void menu2_display_channel_CW();
 void changeCW();
 
 //! Initialize Linduino
@@ -44,19 +31,18 @@ void setup()
   quikeval_I2C_init();              //! Initializes Linduino I2C port.
   quikeval_SPI_init();            //! Initializes Linduino SPI port.
 
-  Serial.begin(115200);             //! Initialize the serial port to the PC
-//  Serial.begin(230400);		// doubling the rate 
+  Serial.begin(230400);             //! Initialize the serial port to the PC
+
   demo_board_connected = discover_DC2094(demo_name);
   if (!demo_board_connected)
   {
-	  Serial.println(F("Error: cannot connect!"));
+    Serial.println("Error: cannot see the demo board");
   }
 
   i2c_read_byte(0x20, &value);      // 0x20 is the port address for i/o expander for I2C.
   value = value & 0x7F;             // P7 = WRIN = 0
   value = value | 0x04;             // P2 = WRIN2 = 1
   i2c_write_byte(0x20, value);
-
   quikeval_SPI_connect();           //! Connects to main SPI port
   changeCW();
 }
@@ -66,20 +52,19 @@ void loop()
 {
   int8_t user_command;                 // The user input command
   uint8_t acknowledge = 0;
-  if (Serial.available())             // Check for user input
-  {
-	  display_adc_output();
-  }
+  display_adc_output();
 }
 
 uint8_t discover_DC2094(char *demo_name)
 {
+  Serial.print(F("\nChecking EEPROM contents..."));
   read_quikeval_id_string(&ui_buffer[0]);
   ui_buffer[48] = 0;
+  Serial.println(ui_buffer);
 
   if (!strcmp(demo_board.product_name, demo_name))
   {
-   return 1;
+    return 1;
   }
   else
   {
@@ -94,16 +79,15 @@ uint8_t discover_DC2094(char *demo_name)
 
 void display_adc_output()
 {
-  uint8_t i,k,pos;
+  uint8_t i, pos;
   uint8_t channel_selected;
   uint8_t *p;
   uint8_t Result[24];
   float voltage;
-  float voltageResults[8];
   uint32_t code;
   union LT_union_int32_4bytes data;
   data.LT_uint32 = 0;
-  uint8_t j = 0;
+
   LTC2348_write(Result);    //discard the first reading
   LTC2348_write(Result);
 
@@ -115,22 +99,20 @@ void display_adc_output()
 
     channel = (data.LT_uint32 & 0x38) >> 3;
     code = (data.LT_uint32 & 0xFFFFC0) >> 6;
-    voltageResults[j] = LTC2348_voltage_calculator(code, channel);
-    j++;
-  }
-
-  for (k = 0; k < 8; k ++)
-  {
-    Serial.print(voltageResults[k], 6);
-    if (k == 7) Serial.println("");  
-    else Serial.print(F(" "));
+    voltage = LTC2348_voltage_calculator(code, channel);
+    Serial.print(voltage, 6);
+    Serial.print(F(":"));
+    if (i == 21)
+    {
+      Serial.println(F(" "));  
+    }
+//    Serial.println(F(" V"));
   }
 }
 
 void changeCW()
 {
-  uint8_t configNum;
-  configNum = 7;
+  uint8_t configNum = 7;
   CWSTRUCT.LTC2348_CHAN0_CONFIG = configNum;
   CWSTRUCT.LTC2348_CHAN1_CONFIG = configNum;
   CWSTRUCT.LTC2348_CHAN2_CONFIG = configNum;
