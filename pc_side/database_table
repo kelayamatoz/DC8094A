@@ -1,0 +1,4 @@
+|channel number (int)|channel reading (float)| channel time (in ms)
+command to create: mysql> CREATE USER 'tianzhao'@'localhost' IDENTIFIED BY 'raspberry'
+command to start: mysql -uroot -hlocalhost -p
+password = raspberry
