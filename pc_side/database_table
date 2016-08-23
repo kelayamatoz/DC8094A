@@ -1,4 +1,5 @@
-|channel number (int)|channel reading (float)| channel time (in ms)
+|channel number (int)|channel reading (float)| channel time (in float, since the start of sampling)
+CREATE TABLE data (channel_no int, channel_reading float, channel_time double)
 command to create: mysql> CREATE USER 'tianzhao'@'localhost' IDENTIFIED BY 'raspberry'
 command to start: mysql -uroot -hlocalhost -p
 password = raspberry

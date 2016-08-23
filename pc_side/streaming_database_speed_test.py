@@ -35,21 +35,25 @@ with serial.Serial(port='/dev/ttyUSB0',baudrate=230400,timeout=1) as ser:
     for i in range(0,8):
         ser.readline()
     start = time.time()
-    while 1:
-        serial_line = ser.readline()
-        cur_time = time.time() - start
-        readings = serial_line.split(':')[0:8]
-        if len(readings) != 8:
-            continue
-        for i in range(0,8):
-            reading = readings[i]
-            channel = i + 1
-            cmd_string = "INSERT INTO data VALUES (" + str(channel) + ", " \
-                    + reading + ", " + str(cur_time) + ");"
-            try:
-                _cur.execute(cmd_string)
-                _conn.commit()
-            except :
-                _conn.rollback()
-                pass
-
+    serial_line = ser.readline()
+    ser_reading_time = time.time()
+    readings = serial_line.split(':')[0:8]
+    process_reading_time = time.time()
+    reading = readings[0]
+    start_inserting_time = time.time()
+    cmd_string = "INSERT INTO data VALUES (" + str(1) + ", " \
+            + reading + ", " + str(time.time() - start) + ");"
+    try:
+        _cur.execute(cmd_string)
+        end_inserting_time = time.time()
+        start_commit_time = end_inserting_time
+        _conn.commit()
+        end_commit_time = time.time()
+    except :
+        _conn.rollback()
+        pass
+    # print stats
+    print 'serial reading required time = ', ser_reading_time - start
+    print 'split required time = ', process_reading_time - ser_reading_time
+    print 'insertion required time = ', end_inserting_time - start_inserting_time
+    print 'commit required time = ', end_commit_time - start_commit_time
