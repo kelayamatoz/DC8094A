@@ -24,7 +24,7 @@ _cur.execute(tab_string)
 conn_re = conn_re | _cur.execute(tab_string)
 if conn_re:
     print 'error: cannot execute ', tab_string
-with serial.Serial(port='/dev/ttyUSB0',baudrate=230400,timeout=1) as ser:
+with serial.Serial(port='/dev/ttyUSB0',baudrate=230400,timeout=None) as ser:
     # cleanup the database everytime the program is starting from fresh
     cmd_string = "DROP TABLE data;"
     _cur.execute(cmd_string)
